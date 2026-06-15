@@ -12,7 +12,7 @@ public class ApiFactory : WebApplicationFactory<Program>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:SQLite"] = "Data Source=:memory:"
+                ["ConnectionStrings:SQLite"] = "Data Source=test_db;Mode=Memory;Cache=Shared"
             });
         });
         base.ConfigureWebHost(builder);

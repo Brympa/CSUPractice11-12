@@ -140,7 +140,132 @@ app.MapGet("/notes", async (
 
 });
 
+app.MapPost("/books", async (
+    [FromBody] BookBody body, 
+    [FromServices] DataContext dataContext,
+    CancellationToken ct) =>
+{
+    var book = new Book
+    {
+        Name = body.Name,
+        Author = body.Author,
+        ReleasedDate = body.ReleasedDate
+    };
+    dataContext.Books.Add(book);
+    await dataContext.SaveChangesAsync(ct);
+
+    return new BookModel
+    {
+        Id = book.Id,
+        Name = book.Name,
+        Author = book.Author,
+        ReleasedDate = book.ReleasedDate
+    };
+});
+
+app.MapGet("/books/{id:int}", async Task<Results<NotFound, Ok<BookModel>>> (
+    [FromRoute] int id,
+    [FromServices] DataContext dataContext,
+    CancellationToken ct) =>
+{
+    var book = await dataContext.Books.FirstOrDefaultAsync(x => x.Id == id, ct);
+    if (book is null)
+    {
+        return TypedResults.NotFound();
+    }
+
+    return TypedResults.Ok(new BookModel
+    {
+        Id = book.Id,
+        Name = book.Name,
+        Author = book.Author,
+        ReleasedDate = book.ReleasedDate
+    });
+});
+
+app.MapPut("/books/{id:int}", async Task<Results<NotFound, Ok<BookModel>>> (
+    [FromRoute] int id,
+    [FromBody] BookBody body,
+    [FromServices] DataContext dataContext,
+    CancellationToken ct) =>
+{
+    var book = await dataContext.Books.FirstOrDefaultAsync(x => x.Id == id, ct);
+    if (book is null)
+    {
+        return TypedResults.NotFound();
+    }
+    
+    book.Name = body.Name;
+    book.Author = body.Author;
+    book.ReleasedDate = body.ReleasedDate;
+    await dataContext.SaveChangesAsync(ct);
+
+    return TypedResults.Ok(new BookModel
+    {
+        Id = book.Id,
+        Name = book.Name,
+        Author = book.Author,
+        ReleasedDate = book.ReleasedDate
+    });
+});
+
+app.MapDelete("/books/{id:int}", async Task<Results<NotFound, NoContent>> (
+    [FromRoute] int id,
+    DataContext dataContext,
+    CancellationToken ct) =>
+{
+    var book = await dataContext.Books.FirstOrDefaultAsync(x => x.Id == id, ct);
+    if (book is null)
+    {
+        return TypedResults.NotFound();
+    }
+    
+    dataContext.Books.Remove(book);
+    await dataContext.SaveChangesAsync(ct);
+    
+    return TypedResults.NoContent();
+});
+
+app.MapGet("/books", async (
+    [FromServices] DataContext dataContext,
+    CancellationToken ct,
+    [FromQuery] string? search = null) =>
+{
+    var query = dataContext.Books.AsQueryable();
+    if (string.IsNullOrEmpty(search) is false)
+    {
+        var searchLower = search.ToLower();
+        query = query.Where(x => x.Name.Contains(search) 
+                              || x.Author.Contains(search)
+                              || x.Name.ToLower().Contains(searchLower) 
+                              || x.Author.ToLower().Contains(searchLower));
+    }
+
+    return await query
+        .Select(x => new BookModel
+        {
+            Id = x.Id,
+            Name = x.Name,
+            Author = x.Author,
+            ReleasedDate = x.ReleasedDate
+        })
+        .OrderByDescending(x => x.Id)
+        .ToListAsync(ct);
+});
+
 app.Run();
+
+public record BookBody
+{
+    public required string Name { get; set; }
+    public required string Author { get; set; }
+    public DateOnly? ReleasedDate { get; set; }
+}
+
+public record BookModel : BookBody
+{
+    public required int Id { get; set; }
+}
 
 public record NoteBody
 {
